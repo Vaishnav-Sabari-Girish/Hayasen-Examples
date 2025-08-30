@@ -735,9 +735,9 @@ checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 
 [[package]]
 name = "hayasen"
-version = "0.0.5"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4adb489212a2421ab8f7f35a70d62f953df1c5250974c48d813b655b58e35bf0"
+checksum = "b7c3008c9b4f1c17dd459719b8af1214d3f2cd3337747f288260b9f67626467a"
 dependencies = [
  "embedded-hal 1.0.0",
 ]
