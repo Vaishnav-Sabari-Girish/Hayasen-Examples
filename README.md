@@ -9,4 +9,4 @@ This repo contains all the examples for the [Hayasen](https://github.com/Vaishna
 
 ## Sensors tested 
 
-1. MPU9250 Inertial Measurement unit.
+1. [MPU9250 Inertial Measurement unit.](./MPU9250/mpu9250.md)

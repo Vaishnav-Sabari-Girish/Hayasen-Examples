@@ -39,56 +39,11 @@ fn main() -> ! {
         .with_scl(scl);
 
     // Create sensor manually and test each step
-    let mut sensor = hayasen::mpu9250::Mpu9250::new(i2c, mpu_address);
+    let mut sensor = mpu9250_hayasen::create_default(i2c, mpu_address).unwrap();
     
-    // Test verify_identity
-    println!("Testing verify_identity...");
-    match sensor.verify_identity() {
-        Ok(_) => println!("✓ verify_identity passed"),
-        Err(e) => {
-            println!("✗ verify_identity failed: {:?}", e);
-            loop { delay.delay_millis(1000); }
-        }
-    }
-
-    // Test configure_power
-    println!("Testing configure_power...");
-    match sensor.configure_power() {
-        Ok(_) => println!("✓ configure_power passed"),
-        Err(e) => {
-            println!("✗ configure_power failed: {:?}", e);
-            loop { delay.delay_millis(1000); }
-        }
-    }
-
-    // Add a small delay after power configuration
-    delay.delay_millis(50);
-
-    // Test setup_accelerometer
-    println!("Testing setup_accelerometer...");
-    match sensor.setup_accelerometer(hayasen::mpu9250::AccelRange::Range2G) {
-        Ok(_) => println!("✓ setup_accelerometer passed"),
-        Err(e) => {
-            println!("✗ setup_accelerometer failed: {:?}", e);
-            loop { delay.delay_millis(1000); }
-        }
-    }
-
-    // Test setup_gyroscope
-    println!("Testing setup_gyroscope...");
-    match sensor.setup_gyroscope(hayasen::mpu9250::GyroRange::Range250Dps) {
-        Ok(_) => println!("✓ setup_gyroscope passed"),
-        Err(e) => {
-            println!("✗ setup_gyroscope failed: {:?}", e);
-            loop { delay.delay_millis(1000); }
-        }
-    }
-
-    println!("All initialization steps completed successfully!");
-
     // Now try reading data
     loop {
-        match hayasen::mpu9250_hayasen::read_all(&mut sensor) {
+        match mpu9250_hayasen::read_all(&mut sensor) {
             Ok((temperature, acceleration, angular_velocity)) => {
                 println!("Temperature : {:.2} C", temperature);
                 println!("Acceleration [X, Y, Z] : [{:.3}, {:.3}, {:.3}] g", acceleration[0], acceleration[1], acceleration[2]);
