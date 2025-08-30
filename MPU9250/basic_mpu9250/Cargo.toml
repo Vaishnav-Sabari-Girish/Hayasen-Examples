@@ -1,6 +1,33 @@
 [package]
-name = "basic_mpu9250"
+edition = "2021"
+name    = "basic_mpu9250"
 version = "0.1.0"
-edition = "2024"
+
+[[bin]]
+name = "basic_mpu9250"
+path = "./src/bin/main.rs"
 
 [dependencies]
+esp-bootloader-esp-idf = "0.1.0"
+esp-hal                = { version = "=1.0.0-beta.1", features = ["esp32c6", "unstable"] }
+
+critical-section = "1.2.0"
+hayasen = { version = "0.0.4", features = ["mpu9250"] }
+embedded-hal = "1.0.0"
+esp-println = { version = "0.15.0", features = ["esp32c6"] }
+esp-backtrace = { version = "0.17.0", features = ["esp32c6", "exception-handler", "panic-handler", "println"] }
+
+
+[profile.dev]
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
+
+[profile.release]
+codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+debug            = 2
+debug-assertions = false
+incremental      = false
+lto              = 'fat'
+opt-level        = 's'
+overflow-checks  = false
