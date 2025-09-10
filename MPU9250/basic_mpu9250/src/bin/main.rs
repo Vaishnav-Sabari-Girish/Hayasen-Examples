@@ -16,7 +16,6 @@ use esp_hal::{
     main
 };
 use esp_println::println;
-use hayasen::prelude::*;
 use hayasen::mpu9250_hayasen;
 
 esp_bootloader_esp_idf::esp_app_desc!();

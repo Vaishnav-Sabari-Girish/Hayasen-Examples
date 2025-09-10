@@ -12,7 +12,7 @@ esp-bootloader-esp-idf = "0.1.0"
 esp-hal                = { version = "=1.0.0-beta.1", features = ["esp32c6", "unstable"] }
 
 critical-section = "1.2.0"
-hayasen = { version = "0.0.7", features = ["mpu9250"] }
+hayasen = { path = "../../../", features = ["mpu9250"] }
 embedded-hal = "1.0.0"
 esp-println = { version = "0.15.0", features = ["esp32c6"] }
 esp-backtrace = { version = "0.17.0", features = ["esp32c6", "exception-handler", "panic-handler", "println"] }
