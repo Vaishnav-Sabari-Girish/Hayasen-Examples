@@ -140,9 +140,121 @@ impl HeartRateDetector {
     }
 }
 
+struct SpO2Detector {
+    red_ac_sum: i64,
+    ir_ac_sum: i64,
+    red_dc_sum: i64,
+    ir_dc_sum: i64,
+    sample_count: u32,
+    red_dc_filter: i32,
+    ir_dc_filter: i32,
+    spo2_value: u32,
+}
+
+impl SpO2Detector {
+    fn new() -> Self {
+        Self {
+            red_ac_sum: 0,
+            ir_ac_sum: 0,
+            red_dc_sum: 0,
+            ir_dc_sum: 0,
+            sample_count: 0,
+            red_dc_filter: 0,
+            ir_dc_filter: 0,
+            spo2_value: 0,
+        }
+    }
+
+    // Separate DC filter methods to avoid borrow checker issues
+    fn red_dc_filter(&mut self, x: i32) -> i32 {
+        let w = x + (15 * self.red_dc_filter) / 16;
+        let result = w - self.red_dc_filter;
+        self.red_dc_filter = w;
+        result
+    }
+
+    fn ir_dc_filter(&mut self, x: i32) -> i32 {
+        let w = x + (15 * self.ir_dc_filter) / 16;
+        let result = w - self.ir_dc_filter;
+        self.ir_dc_filter = w;
+        result
+    }
+
+    fn process_sample(&mut self, red: u32, ir: u32) -> Option<u32> {
+        if red < 1000 || ir < 1000 {
+            return Some(self.spo2_value);
+        }
+
+        // Apply DC filters using separate methods
+        let red_dc = self.red_dc_filter(red as i32);
+        let ir_dc = self.ir_dc_filter(ir as i32);
+
+        // Accumulate AC (filtered) and DC (original) values
+        self.red_ac_sum += red_dc.abs() as i64;
+        self.ir_ac_sum += ir_dc.abs() as i64;
+        self.red_dc_sum += red as i64;
+        self.ir_dc_sum += ir as i64;
+        self.sample_count += 1;
+
+        // Calculate SpO2 every 100 samples
+        if self.sample_count >= 100 {
+            let red_ac_avg = self.red_ac_sum / self.sample_count as i64;
+            let ir_ac_avg = self.ir_ac_sum / self.sample_count as i64;
+            let red_dc_avg = self.red_dc_sum / self.sample_count as i64;
+            let ir_dc_avg = self.ir_dc_sum / self.sample_count as i64;
+
+            // Calculate R ratio (Red AC/DC divided by IR AC/DC)
+            if red_dc_avg > 0 && ir_dc_avg > 0 && ir_ac_avg > 0 {
+                let red_ratio = (red_ac_avg * 1000) / red_dc_avg;
+                let ir_ratio = (ir_ac_avg * 1000) / ir_dc_avg;
+
+                if ir_ratio > 0 {
+                    let r_ratio = (red_ratio * 1000) / ir_ratio;
+
+                    // SpO2 calibration formula (empirically derived)
+                    // SpO2 = 104 - 17 * R
+                    let spo2_calc = 104000 - (17 * r_ratio);
+                    let spo2_percent = spo2_calc / 1000;
+
+                    // Clamp SpO2 to reasonable range (70-100%)
+                    let spo2_final = if spo2_percent < 70 {
+                        70
+                    } else if spo2_percent > 100 {
+                        100
+                    } else {
+                        spo2_percent as u32
+                    };
+
+                    // Simple averaging filter
+                    if self.spo2_value == 0 {
+                        self.spo2_value = spo2_final;
+                    } else {
+                        self.spo2_value = (self.spo2_value * 3 + spo2_final) / 4;
+                    }
+                }
+            }
+
+            // Reset accumulators
+            self.red_ac_sum = 0;
+            self.ir_ac_sum = 0;
+            self.red_dc_sum = 0;
+            self.ir_dc_sum = 0;
+            self.sample_count = 0;
+        }
+
+        Some(self.spo2_value)
+    }
+
+    fn get_signal_quality(&self, red: u32, ir: u32) -> bool {
+        // Consider signal good if both values are above threshold
+        red > 5000 && ir > 5000
+    }
+}
+
 #[main]
 fn main() -> ! {
-    info!("MAX30102 Heart Rate Monitor");
+    info!("MAX30102 Health Monitor");
+    info!("Heart Rate | Temperature | SpO2");
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
@@ -173,42 +285,92 @@ fn main() -> ! {
     info!("Place finger on sensor and keep still...");
 
     let mut hr_detector = HeartRateDetector::new();
+    let mut spo2_detector = SpO2Detector::new();
     let mut sample_buffer: [FifoSample; 16] = core::array::from_fn(|_| FifoSample { red: 0, ir: 0 });
 
     let mut time_ms: u32 = 0;
     let mut temp_counter = 0;
     let mut current_bpm: u32 = 0;
-    let mut last_hr_display = 0;
+    let mut current_spo2: u32 = 0;
+    let mut current_temp: f32 = 0.0;
+    let mut last_display = 0;
+    let mut display_phase = 0; // 0 = HR, 1 = Temp, 2 = SpO2
 
     loop {
         if let Ok(count) = read_fifo_batch(&mut sensor, &mut sample_buffer) {
             if count > 0 {
                 for i in 0..count {
-                    if let Some(bpm) = hr_detector.process_sample(sample_buffer[i].ir, time_ms) {
+                    let red = sample_buffer[i].red;
+                    let ir = sample_buffer[i].ir;
+
+                    // Process for heart rate
+                    if let Some(bpm) = hr_detector.process_sample(ir, time_ms) {
                         current_bpm = bpm;
                     }
+
+                    // Process for SpO2
+                    if let Some(spo2) = spo2_detector.process_sample(red, ir) {
+                        current_spo2 = spo2;
+                    }
+                    
                     time_ms += 10;
                 }
             }
         }
 
-        if time_ms.saturating_sub(last_hr_display) >= 2000 {
-            last_hr_display = time_ms;
+        // Display readings sequentially every 3 seconds
+        if time_ms.saturating_sub(last_display) >= 3000 {
+            last_display = time_ms;
             
-            if current_bpm > 0 {
-                info!("💓 Heart Rate: {} BPM", current_bpm);
-            } else {
-                let signal_range = hr_detector.get_signal_range();
-                if signal_range < 500 {
-                    info!("⚠️  Place finger firmly on sensor");
-                } else {
-                    info!("🔍 Detecting heartbeat...");
+            match display_phase {
+                0 => {
+                    // Display Heart Rate
+                    if current_bpm > 0 {
+                        info!("💓 Heart Rate: {} BPM", current_bpm);
+                    } else {
+                        let signal_range = hr_detector.get_signal_range();
+                        if signal_range < 500 {
+                            info!("⚠️  Place finger firmly on sensor");
+                        } else {
+                            info!("🔍 Detecting heartbeat...");
+                        }
+                    }
+                    display_phase = 1;
+                }
+                1 => {
+                    // Display Temperature
+                    if current_temp > 0.0 {
+                        info!("🌡️  Temperature: {}°C", current_temp);
+                    } else {
+                        info!("🌡️  Reading temperature...");
+                    }
+                    display_phase = 2;
+                }
+                2 => {
+                    // Display SpO2
+                    if current_spo2 > 0 {
+                        let red_sample = if sample_buffer.len() > 0 { sample_buffer[0].red } else { 0 };
+                        let ir_sample = if sample_buffer.len() > 0 { sample_buffer[0].ir } else { 0 };
+                        
+                        if spo2_detector.get_signal_quality(red_sample, ir_sample) {
+                            info!("🫁 SpO2: {}%", current_spo2);
+                        } else {
+                            info!("🫁 Improving SpO2 signal...");
+                        }
+                    } else {
+                        info!("🫁 Calculating SpO2...");
+                    }
+                    display_phase = 0;
+                }
+                _ => {
+                    display_phase = 0;
                 }
             }
             
             hr_detector.reset_if_no_signal();
         }
 
+        // Read temperature every 250 cycles (about every 5 seconds)
         temp_counter += 1;
         if temp_counter >= 250 {
             temp_counter = 0;
@@ -216,7 +378,7 @@ fn main() -> ! {
             delay.delay_millis(30);
 
             if let Ok(Some(temp)) = read_temperature(&mut sensor) {
-                info!("🌡️  Temperature: {}°C", temp);
+                current_temp = temp;
             }
         }
 
