@@ -52,6 +52,6 @@ fn main() -> ! {
                 println!("Failed to read sensor data: {:?}", e);
             }
         }
-        delay.delay_millis(1000);
+        delay.delay_millis(500);
     }
 }
