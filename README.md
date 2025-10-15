@@ -6,6 +6,7 @@ This repo contains all the examples for the [Hayasen](https://github.com/Vaishna
 
 1. Glyph C6 (ESP32 C6 Mini based board)
 2. Nordic nRF52850 Development Kit
+3. ESP32 WROOM 32
 
 ## Sensors tested 
 
