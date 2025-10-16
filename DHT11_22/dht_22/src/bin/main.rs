@@ -46,6 +46,7 @@ fn main() -> ! {
     let mut dht22 = match dhtx_hayasen::create_dht22(od_for_dht22, delay) {
         Ok(sensor) => {
             info!("DHT22 initialized successfully");
+            sensor
         },
         Err(e) => {
             error!("Failed to initialized DHT22: {:?}", e);
