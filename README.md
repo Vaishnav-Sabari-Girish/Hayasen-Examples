@@ -13,3 +13,4 @@ This repo contains all the examples for the [Hayasen](https://github.com/Vaishna
 1. [MPU9250 Inertial Measurement unit](./MPU9250/mpu9250.md)
 2. [MPU6050 Inertial Measurement unit](./MPU6050/mpu6050.md)
 3. [MAX30102 Pulse Oximeter and Heart Rate Monitor](./MAX30102/README.md)
+4. [DHTx Sensors]
