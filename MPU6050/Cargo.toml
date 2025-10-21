@@ -24,7 +24,7 @@ esp-backtrace = { version = "0.16.0", features = [
   "println",
 ] }
 esp-println = { version = "0.14.0", features = ["esp32", "log-04"] }
-hayasen = { version = "0.0.9", path = "../..", features = ["mpu6050"] }
+hayasen = { path = "../..", features = ["mpu6050"] }
 
 
 [profile.dev]
